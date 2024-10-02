@@ -1,0 +1,229 @@
+<html><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agrobox - Gestão de Ordens de Serviço</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .logo {
+            max-width: 200px;
+            margin-bottom: 20px;
+        }
+        #osTable {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        #osTable th, #osTable td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        #osTable th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img src="https://images.tcdn.com.br/files/1348407/themes/7/img/settings/LOGOAGROBOX2.png?29b6d5dbc130f74e0403cd5e6e99725c" alt="Logo da Agrobox, empresa de tecnologia agrícola" class="logo">
+        <h1>Gestão de Ordens de Serviço - Agrobox</h1>
+        
+        <form id="osForm" class="mb-4">
+            <div class="row g-3">
+                <div class="col-md-2">
+                    <label for="data" class="form-label">Data</label>
+                    <input type="date" class="form-control" id="data" required>
+                </div>
+                <div class="col-md-2">
+                    <label for="numeroOS" class="form-label">Nº da OS</label>
+                    <input type="text" class="form-control" id="numeroOS" required>
+                </div>
+                <div class="col-md-3">
+                    <label for="equipamento" class="form-label">Equipamento</label>
+                    <input type="text" class="form-control" id="equipamento" required>
+                </div>
+                <div class="col-md-3">
+                    <label for="cliente" class="form-label">Nome do Cliente</label>
+                    <input type="text" class="form-control" id="cliente" required>
+                </div>
+                <div class="col-md-2">
+                    <label for="tecnico" class="form-label">Técnico</label>
+                    <input type="text" class="form-control" id="tecnico" required>
+                </div>
+                <div class="col-md-2">
+                    <label for="valorTotal" class="form-label">Valor Total do Serviço</label>
+                    <input type="number" class="form-control" id="valorTotal" step="0.01" required>
+                </div>
+                <div class="col-md-2">
+                    <label for="execucao" class="form-label">% de Execução</label>
+                    <input type="number" class="form-control" id="execucao" min="0" max="100" required>
+                </div>
+                <div class="col-md-2">
+                    <label for="comissaoPercentual" class="form-label">% de Comissão</label>
+                    <input type="number" class="form-control" id="comissaoPercentual" step="0.01" required>
+                </div>
+                <div class="col-md-2">
+                    <label for="comissaoTecnico" class="form-label">Comissão do Técnico</label>
+                    <input type="number" class="form-control" id="comissaoTecnico" step="0.01" readonly>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary mt-3">Adicionar / Atualizar OS</button>
+        </form>
+
+        <table id="osTable" class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Nº da OS</th>
+                    <th>Equipamento</th>
+                    <th>Nome do Cliente</th>
+                    <th>Técnico</th>
+                    <th>Valor Total</th>
+                    <th>% Execução</th>
+                    <th>% Comissão</th>
+                    <th>Comissão Técnico</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+
+        <div class="mt-4">
+            <button id="exportPDF" class="btn btn-success">Exportar PDF</button>
+        </div>
+    </div>
+
+    <script>
+        let ordens = JSON.parse(localStorage.getItem('ordens')) || [];
+
+        document.getElementById('osForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const ordem = {
+                data: document.getElementById('data').value,
+                numeroOS: document.getElementById('numeroOS').value,
+                equipamento: document.getElementById('equipamento').value,
+                cliente: document.getElementById('cliente').value,
+                tecnico: document.getElementById('tecnico').value,
+                valorTotal: parseFloat(document.getElementById('valorTotal').value),
+                execucao: parseInt(document.getElementById('execucao').value),
+                comissaoPercentual: parseFloat(document.getElementById('comissaoPercentual').value),
+                comissaoTecnico: parseFloat(document.getElementById('comissaoTecnico').value)
+            };
+
+            const index = ordens.findIndex(o => o.numeroOS === ordem.numeroOS);
+            if (index !== -1) {
+                ordens[index] = ordem;
+            } else {
+                ordens.push(ordem);
+            }
+
+            localStorage.setItem('ordens', JSON.stringify(ordens));
+            renderTable();
+            this.reset();
+        });
+
+        document.getElementById('valorTotal').addEventListener('input', calcularComissao);
+        document.getElementById('comissaoPercentual').addEventListener('input', calcularComissao);
+
+        function calcularComissao() {
+            const valorTotal = parseFloat(document.getElementById('valorTotal').value) || 0;
+            const comissaoPercentual = parseFloat(document.getElementById('comissaoPercentual').value) || 0;
+            const comissaoTecnico = valorTotal * (comissaoPercentual / 100);
+            document.getElementById('comissaoTecnico').value = comissaoTecnico.toFixed(2);
+        }
+
+        function renderTable() {
+            const tbody = document.querySelector('#osTable tbody');
+            tbody.innerHTML = '';
+            ordens.forEach((ordem, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${ordem.data}</td>
+                    <td>${ordem.numeroOS}</td>
+                    <td>${ordem.equipamento}</td>
+                    <td>${ordem.cliente}</td>
+                    <td>${ordem.tecnico}</td>
+                    <td>R$ ${ordem.valorTotal.toFixed(2)}</td>
+                    <td>${ordem.execucao}%</td>
+                    <td>${ordem.comissaoPercentual}%</td>
+                    <td>R$ ${ordem.comissaoTecnico.toFixed(2)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-warning" onclick="editarOS(${index})">Editar</button>
+                        <button class="btn btn-sm btn-danger" onclick="excluirOS(${index})">Excluir</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function editarOS(index) {
+            const ordem = ordens[index];
+            document.getElementById('data').value = ordem.data;
+            document.getElementById('numeroOS').value = ordem.numeroOS;
+            document.getElementById('equipamento').value = ordem.equipamento;
+            document.getElementById('cliente').value = ordem.cliente;
+            document.getElementById('tecnico').value = ordem.tecnico;
+            document.getElementById('valorTotal').value = ordem.valorTotal;
+            document.getElementById('execucao').value = ordem.execucao;
+            document.getElementById('comissaoPercentual').value = ordem.comissaoPercentual;
+            document.getElementById('comissaoTecnico').value = ordem.comissaoTecnico.toFixed(2);
+        }
+
+        function excluirOS(index) {
+            if (confirm('Tem certeza que deseja excluir esta OS?')) {
+                ordens.splice(index, 1);
+                localStorage.setItem('ordens', JSON.stringify(ordens));
+                renderTable();
+            }
+        }
+
+        document.getElementById('exportPDF').addEventListener('click', function() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            doc.setFontSize(18);
+            doc.text('Relatório de Ordens de Serviço - Agrobox', 14, 22);
+
+            const headers = [['Data', 'Nº OS', 'Equipamento', 'Cliente', 'Técnico', 'Valor Total', '% Exec.', '% Com.', 'Comissão']];
+            const data = ordens.map(ordem => [
+                ordem.data,
+                ordem.numeroOS,
+                ordem.equipamento,
+                ordem.cliente,
+                ordem.tecnico,
+                `R$ ${ordem.valorTotal.toFixed(2)}`,
+                `${ordem.execucao}%`,
+                `${ordem.comissaoPercentual}%`,
+                `R$ ${ordem.comissaoTecnico.toFixed(2)}`
+            ]);
+
+            const totalValorServicos = ordens.reduce((total, ordem) => total + ordem.valorTotal, 0);
+            const totalComissoes = ordens.reduce((total, ordem) => total + ordem.comissaoTecnico, 0);
+
+            doc.autoTable({
+                head: headers,
+                body: data,
+                startY: 30,
+                theme: 'grid',
+                styles: { fontSize: 8 },
+                columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 15 } }
+            });
+
+            const finalY = doc.lastAutoTable.finalY || 30;
+            doc.setFontSize(12);
+            doc.text(`Total Valor dos Serviços: R$ ${totalValorServicos.toFixed(2)}`, 14, finalY + 10);
+            doc.text(`Total das Comissões: R$ ${totalComissoes.toFixed(2)}`, 14, finalY + 20);
+
+            doc.save('relatorio-os-agrobox.pdf');
+        });
+
+        renderTable();
+    </script>
+</body>
+</html>
